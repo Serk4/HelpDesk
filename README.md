@@ -73,10 +73,10 @@ Key design goals:
 ### Project Structure
 
 HelpDesk/
-├── Domain/                 # Entities, enums, domain logic
-├── Application/            # Interfaces and application services
-├── Infrastructure/         # EF Core, Identity, repositories
-├── HelpDesk/               # Blazor Web App (Presentation)
+├── Domain/          # Entities, enums, domain logic
+├── Application/     # Interfaces, DTOs, application services
+├── Infrastructure/  # EF Core, Identity, repositories
+├── HelpDesk/        # Blazor Web App (Presentation)
 └── README.md
 
 ### Domain Highlights
@@ -88,11 +88,11 @@ HelpDesk/
 
 ### Roadmap
 
-- `[]` File attachments
-- `[]` Basic SLA tracking / overdue highlighting
-- `[]` Background job example (auto-escalation)
-- `[]` Reporting (volume & resolution time)
-- `[]` Improved dashboard visualizations
+- [ ] File attachments
+- [ ] Basic SLA tracking / overdue highlighting
+- [ ] Background job example (auto-escalation)
+- [ ] Reporting (volume & resolution time)
+- [ ] Improved dashboard visualizations
 
 ### License
 
