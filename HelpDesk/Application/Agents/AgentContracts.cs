@@ -59,3 +59,45 @@ public interface IPlannerAgent : IAgent
 {
     Task<PlannerOutput> CreatePlanAsync(AgentRequest request, CancellationToken cancellationToken = default);
 }
+
+public sealed record CodeChange(
+    string FilePath,
+    string Description,
+    IReadOnlyList<string> Lines);
+
+public sealed record CoderOutput(
+    string Summary,
+    IReadOnlyList<CodeChange> Changes,
+    IReadOnlyList<string> TestCasesGenerated,
+    IReadOnlyList<string> Dependencies,
+    IReadOnlyList<string> Warnings,
+    bool RequiresReview = false);
+
+public interface ICoderAgent : IAgent
+{
+    Task<CoderOutput> GenerateCodeAsync(
+        PlanStep planStep,
+        string? previousContext = null,
+        CancellationToken cancellationToken = default);
+}
+
+public sealed record UIComponent(
+    string Name,
+    string Markup,
+    IReadOnlyList<string> Dependencies);
+
+public sealed record DesignerOutput(
+    string Summary,
+    IReadOnlyList<UIComponent> Components,
+    IReadOnlyList<string> Styles,
+    IReadOnlyList<string> InteractionPatterns,
+    IReadOnlyList<string> AccessibilityConsiderations,
+    bool RequiresUserTesting = false);
+
+public interface IDesignerAgent : IAgent
+{
+    Task<DesignerOutput> DesignUIAsync(
+        PlanStep planStep,
+        string? userRequirements = null,
+        CancellationToken cancellationToken = default);
+}

@@ -85,25 +85,55 @@ public sealed class PlannerAgent : IPlannerAgent
     }
 }
 
-public sealed class CoderAgent : IAgent
+public sealed class CoderAgent : ICoderAgent
 {
     public AgentRole Role => AgentRole.Coder;
 
-    public Task<AgentResponse> ExecuteAsync(AgentRequest request, CancellationToken cancellationToken = default)
+    public async Task<AgentResponse> ExecuteAsync(AgentRequest request, CancellationToken cancellationToken = default)
     {
-        var taskId = request.Metadata?.GetValueOrDefault("TaskId");
-        var files = ParseFiles(request.Metadata?.GetValueOrDefault("Files"));
+        var coderOutput = await GenerateCodeAsync(
+            new PlanStep(
+                Id: request.Metadata?.GetValueOrDefault("TaskId") ?? Guid.NewGuid().ToString(),
+                Assignee: AgentRole.Coder,
+                Description: request.Objective,
+                Files: ParseFiles(request.Metadata?.GetValueOrDefault("Files")),
+                DependsOn: null),
+            request.Context,
+            cancellationToken);
 
-        return Task.FromResult(new AgentResponse(
+        return new AgentResponse(
             Role,
-            $"Implementation task accepted: {request.Objective}",
-            [
-                "Follow existing project architecture and conventions.",
-                "Keep behavior deterministic and testable.",
-                "Validate with build/tests after changes."
-            ],
-            taskId,
-            files));
+            coderOutput.Summary,
+            coderOutput.Changes.Select(c => c.Description).ToList(),
+            request.Metadata?.GetValueOrDefault("TaskId"),
+            coderOutput.Changes.Select(c => c.FilePath).ToList());
+    }
+
+    public async Task<CoderOutput> GenerateCodeAsync(
+        PlanStep planStep,
+        string? previousContext = null,
+        CancellationToken cancellationToken = default)
+    {
+        // Stub implementation for now
+        // TODO: Integrate with LLM for actual code generation
+
+        var changes = new List<CodeChange>
+        {
+            new(
+                "Implementation_Stub",
+                "Code generation logic to be implemented",
+                new[] { "// TODO: Implement" })
+        };
+
+        return new CoderOutput(
+            $"Implementation task accepted: {planStep.Description}",
+            changes,
+            [],
+            [],
+            ["Follow existing project architecture and conventions.",
+             "Keep behavior deterministic and testable.",
+             "Validate with build/tests after changes."],
+            RequiresReview: true);
     }
 
     private static IReadOnlyList<string> ParseFiles(string? files)
@@ -117,25 +147,55 @@ public sealed class CoderAgent : IAgent
     }
 }
 
-public sealed class DesignerAgent : IAgent
+public sealed class DesignerAgent : IDesignerAgent
 {
     public AgentRole Role => AgentRole.Designer;
 
-    public Task<AgentResponse> ExecuteAsync(AgentRequest request, CancellationToken cancellationToken = default)
+    public async Task<AgentResponse> ExecuteAsync(AgentRequest request, CancellationToken cancellationToken = default)
     {
-        var taskId = request.Metadata?.GetValueOrDefault("TaskId");
-        var files = ParseFiles(request.Metadata?.GetValueOrDefault("Files"));
+        var designerOutput = await DesignUIAsync(
+            new PlanStep(
+                Id: request.Metadata?.GetValueOrDefault("TaskId") ?? Guid.NewGuid().ToString(),
+                Assignee: AgentRole.Designer,
+                Description: request.Objective,
+                Files: ParseFiles(request.Metadata?.GetValueOrDefault("Files")),
+                DependsOn: null),
+            request.Context,
+            cancellationToken);
 
-        return Task.FromResult(new AgentResponse(
+        return new AgentResponse(
             Role,
-            $"Design task accepted: {request.Objective}",
-            [
-                "Prioritize usability and accessibility.",
-                "Align interaction patterns with Blazor component structure.",
-                "Deliver concrete UI acceptance criteria."
-            ],
-            taskId,
-            files));
+            designerOutput.Summary,
+            designerOutput.Components.Select(c => $"Create component: {c.Name}").ToList(),
+            request.Metadata?.GetValueOrDefault("TaskId"),
+            designerOutput.Components.Select(c => $"{c.Name}.razor").ToList());
+    }
+
+    public async Task<DesignerOutput> DesignUIAsync(
+        PlanStep planStep,
+        string? userRequirements = null,
+        CancellationToken cancellationToken = default)
+    {
+        // Stub implementation for now
+        // TODO: Integrate with LLM for UI/UX design and Blazor component generation
+
+        var components = new List<UIComponent>
+        {
+            new(
+                "UIStub",
+                "<!-- TODO: Implement UI design -->",
+                new[] { "BlazorComponent" })
+        };
+
+        return new DesignerOutput(
+            $"Design task accepted: {planStep.Description}",
+            components,
+            [],
+            ["Prioritize usability and accessibility.",
+             "Align interaction patterns with Blazor component structure.",
+             "Deliver concrete UI acceptance criteria."],
+            ["WCAG 2.1 Level AA accessibility"],
+            RequiresUserTesting: true);
     }
 
     private static IReadOnlyList<string> ParseFiles(string? files)
@@ -152,14 +212,23 @@ public sealed class DesignerAgent : IAgent
 public sealed class OrchestratorAgent
 {
     private readonly IPlannerAgent _planner;
+    private readonly ICoderAgent _coder;
+    private readonly IDesignerAgent _designer;
     private readonly IReadOnlyDictionary<AgentRole, IAgent> _specialists;
 
-    public OrchestratorAgent(IEnumerable<IAgent> agents)
+    public OrchestratorAgent(
+        IPlannerAgent planner,
+        ICoderAgent coder,
+        IDesignerAgent designer)
     {
-        _planner = agents.OfType<IPlannerAgent>().First();
-        _specialists = agents
-            .Where(agent => agent.Role is AgentRole.Coder or AgentRole.Designer)
-            .ToDictionary(agent => agent.Role);
+        _planner = planner ?? throw new ArgumentNullException(nameof(planner));
+        _coder = coder ?? throw new ArgumentNullException(nameof(coder));
+        _designer = designer ?? throw new ArgumentNullException(nameof(designer));
+        _specialists = new Dictionary<AgentRole, IAgent>
+        {
+            { AgentRole.Coder, coder },
+            { AgentRole.Designer, designer }
+        };
     }
 
     public async Task<OrchestrationResult> RunAsync(AgentRequest request, CancellationToken cancellationToken = default)
@@ -174,14 +243,21 @@ public sealed class OrchestratorAgent
         audit.Add(NewAudit($"Step 2: parsed plan into {phases.Count} phase(s)."));
 
         var responses = new List<AgentResponse>();
+        var contextChain = request.Context;
 
         foreach (var phase in phases)
         {
             audit.Add(NewAudit($"Step 3: executing phase {phase.Number} with {phase.Tasks.Count} task(s)."));
 
-            var tasks = phase.Tasks.Select(planStep => ExecutePlanStepAsync(request, planStep, cancellationToken)).ToArray();
+            var tasks = phase.Tasks.Select(planStep => ExecutePlanStepAsync(request, planStep, contextChain, cancellationToken)).ToArray();
             var phaseOutputs = await Task.WhenAll(tasks);
             responses.AddRange(phaseOutputs);
+
+            // Chain context: each phase's output becomes input context for the next phase
+            if (phaseOutputs.Any())
+            {
+                contextChain = string.Join("\n---\n", phaseOutputs.Select(r => r.Output));
+            }
 
             audit.Add(NewAudit($"Completed phase {phase.Number}."));
         }
@@ -199,7 +275,11 @@ public sealed class OrchestratorAgent
             report);
     }
 
-    private async Task<AgentResponse> ExecutePlanStepAsync(AgentRequest originalRequest, PlanStep step, CancellationToken cancellationToken)
+    private async Task<AgentResponse> ExecutePlanStepAsync(
+        AgentRequest originalRequest,
+        PlanStep step,
+        string contextChain,
+        CancellationToken cancellationToken)
     {
         if (!_specialists.TryGetValue(step.Assignee, out var specialist))
         {
@@ -212,7 +292,7 @@ public sealed class OrchestratorAgent
             ["Files"] = string.Join('|', step.Files)
         };
 
-        var taskRequest = new AgentRequest(step.Description, originalRequest.Context, metadata);
+        var taskRequest = new AgentRequest(step.Description, contextChain, metadata);
         return await specialist.ExecuteAsync(taskRequest, cancellationToken);
     }
 

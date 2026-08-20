@@ -38,8 +38,11 @@ builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSe
 
 // Agent registrations
 builder.Services.AddScoped<IAgent, PlannerAgent>();
+builder.Services.AddScoped<IPlannerAgent, PlannerAgent>();
 builder.Services.AddScoped<IAgent, CoderAgent>();
+builder.Services.AddScoped<ICoderAgent, CoderAgent>();
 builder.Services.AddScoped<IAgent, DesignerAgent>();
+builder.Services.AddScoped<IDesignerAgent, DesignerAgent>();
 builder.Services.AddScoped<OrchestratorAgent>();
 
 var app = builder.Build();
