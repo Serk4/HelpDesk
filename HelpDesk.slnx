@@ -1,3 +1,10 @@
 <Solution>
+  <Folder Name="/docs/">
+    <File Path="../../../.copilot/agents/coder.agent.md" />
+    <File Path="../../../.copilot/agents/designer.agent.md" />
+    <File Path="../../../.copilot/agents/orchestrator.agent.md" />
+    <File Path="../../../.copilot/agents/planner.agent.md" />
+    <File Path="PRD.md" />
+  </Folder>
   <Project Path="HelpDesk/HelpDesk.csproj" />
 </Solution>

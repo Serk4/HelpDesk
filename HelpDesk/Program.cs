@@ -1,3 +1,4 @@
+using HelpDesk.Application.Agents;
 using HelpDesk.Components;
 using HelpDesk.Components.Account;
 using HelpDesk.Data;
@@ -35,6 +36,12 @@ builder.Services.AddIdentityCore<ApplicationUser>(options => options.SignIn.Requ
 
 builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
 
+// Agent registrations
+builder.Services.AddScoped<IAgent, PlannerAgent>();
+builder.Services.AddScoped<IAgent, CoderAgent>();
+builder.Services.AddScoped<IAgent, DesignerAgent>();
+builder.Services.AddScoped<OrchestratorAgent>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -45,12 +52,10 @@ if (app.Environment.IsDevelopment())
 else
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
 
 app.UseHttpsRedirection();
-
 
 app.UseAntiforgery();
 
@@ -60,5 +65,24 @@ app.MapRazorComponents<App>()
 
 // Add additional endpoints required by the Identity /Account Razor components.
 app.MapAdditionalIdentityEndpoints();
+
+// Orchestration endpoints
+app.MapPost("/api/agents/orchestrate", async (
+    AgentRequest request,
+    OrchestratorAgent orchestrator,
+    CancellationToken ct) =>
+{
+    var result = await orchestrator.RunAsync(request, ct);
+    return Results.Ok(result);
+});
+
+app.MapPost("/api/agents/kickoff", async (
+    AgentRequest request,
+    OrchestratorAgent orchestrator,
+    CancellationToken ct) =>
+{
+    var result = await orchestrator.RunAsync(request, ct);
+    return Results.Ok(result);
+});
 
 app.Run();
