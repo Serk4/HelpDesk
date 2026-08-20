@@ -1,4 +1,5 @@
 using HelpDesk.Application.Agents;
+using HelpDesk.Application.Services;
 using HelpDesk.Components;
 using HelpDesk.Components.Account;
 using HelpDesk.Data;
@@ -44,6 +45,9 @@ builder.Services.AddScoped<ICoderAgent, CoderAgent>();
 builder.Services.AddScoped<IAgent, DesignerAgent>();
 builder.Services.AddScoped<IDesignerAgent, DesignerAgent>();
 builder.Services.AddScoped<OrchestratorAgent>();
+
+// HTTP Client and Services
+builder.Services.AddHttpClient<IAgentsService, AgentsService>();
 
 var app = builder.Build();
 

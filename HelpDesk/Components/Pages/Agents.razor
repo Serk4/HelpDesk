@@ -1,0 +1,314 @@
+@page "/agents"
+@using HelpDesk.Application.Agents
+@using HelpDesk.Application.Services
+@inject IAgentsService AgentsService
+@inject ILogger<Agents> Logger
+
+<PageTitle>Agent Pipeline Orchestrator</PageTitle>
+
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-lg-12">
+            <h1 class="mb-4">
+                <i class="bi bi-robot"></i> Agent Pipeline Orchestrator
+            </h1>
+
+            <!-- Input Section -->
+            <div class="card mb-4 border-primary">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Launch Agent Pipeline</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="objective" class="form-label fw-bold">Objective</label>
+                        <textarea
+                            id="objective"
+                            class="form-control"
+                            rows="4"
+                            placeholder="Enter your objective (e.g., 'Create a user management dashboard')"
+                            @bind="Objective"
+                            disabled="@IsExecuting" />
+                        <small class="text-muted">
+                            Describe what you want the agents to design, code, and integrate.
+                        </small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="context" class="form-label fw-bold">Optional Context</label>
+                        <textarea
+                            id="context"
+                            class="form-control"
+                            rows="3"
+                            placeholder="Additional context for the agents (optional)"
+                            @bind="OptionalContext"
+                            disabled="@IsExecuting" />
+                        <small class="text-muted">
+                            Provide any additional context about requirements, constraints, or dependencies.
+                        </small>
+                    </div>
+
+                    <button
+                        class="btn btn-lg btn-primary me-2"
+                        @onclick="ExecuteAsync"
+                        disabled="@IsExecuting">
+                        @if (IsExecuting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            <span>Running Pipeline...</span>
+                        }
+                        else
+                        {
+                            <span>🚀 Run Agent Pipeline</span>
+                        }
+                    </button>
+
+                    @if (!string.IsNullOrEmpty(ErrorMessage))
+                    {
+                        <div class="alert alert-danger mt-3 mb-0" role="alert">
+                            <strong>Error:</strong> @ErrorMessage
+                        </div>
+                    }
+                </div>
+            </div>
+
+            @if (Result != null)
+            {
+                <!-- Results Section -->
+                <div class="card mb-4 border-success">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">✓ Orchestration Results</h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Objective Summary -->
+                        <div class="alert alert-info" role="alert">
+                            <strong>Objective:</strong> @Result.Objective
+                        </div>
+
+                        <!-- Planner Output -->
+                        <div class="card mb-4 border-info">
+                            <div class="card-header bg-info text-white">
+                                <h6 class="mb-0">📋 Planner Summary</h6>
+                            </div>
+                            <div class="card-body">
+                                <p>@Result.Planner.Summary</p>
+
+                                <h6 class="mt-3 mb-2">Planned Steps:</h6>
+                                <div class="list-group">
+                                    @foreach (var step in Result.Planner.Steps)
+                                    {
+                                        <div class="list-group-item">
+                                            <div class="d-flex w-100 justify-content-between align-items-start">
+                                                <div class="flex-grow-1">
+                                                    <h6 class="mb-1">
+                                                        <span class="badge bg-secondary">@step.Id</span>
+                                                        @step.Description
+                                                    </h6>
+                                                    <small class="text-muted">
+                                                        Assignee: <strong>@step.Assignee</strong>
+                                                    </small>
+                                                </div>
+                                            </div>
+                                            <div class="mt-2">
+                                                <small class="d-block text-muted mb-1">
+                                                    <strong>Files:</strong>
+                                                </small>
+                                                <div class="ms-2">
+                                                    @foreach (var file in step.Files)
+                                                    {
+                                                        <code class="d-block text-secondary">@file</code>
+                                                    }
+                                                </div>
+                                            </div>
+                                            @if (step.DependsOn?.Any() == true)
+                                            {
+                                                <div class="mt-2">
+                                                    <small class="d-block text-muted">
+                                                        <strong>Depends On:</strong> @string.Join(", ", step.DependsOn)
+                                                    </small>
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+
+                                @if (Result.Planner.EdgeCases.Any())
+                                {
+                                    <div class="mt-3">
+                                        <h6 class="mb-2">Edge Cases:</h6>
+                                        <ul class="mb-0">
+                                            @foreach (var edge in Result.Planner.EdgeCases)
+                                            {
+                                                <li>@edge</li>
+                                            }
+                                        </ul>
+                                    </div>
+                                }
+
+                                @if (Result.Planner.OpenQuestions.Any())
+                                {
+                                    <div class="mt-3">
+                                        <h6 class="mb-2">Open Questions:</h6>
+                                        <ul class="mb-0">
+                                            @foreach (var question in Result.Planner.OpenQuestions)
+                                            {
+                                                <li>@question</li>
+                                            }
+                                        </ul>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+
+                        <!-- Execution Phases -->
+                        <div class="card mb-4 border-warning">
+                            <div class="card-header bg-warning text-dark">
+                                <h6 class="mb-0">⚙️ Execution Phases (@Result.Phases.Count)</h6>
+                            </div>
+                            <div class="card-body">
+                                @foreach (var phase in Result.Phases)
+                                {
+                                    <div class="mb-3 p-3 bg-light border rounded">
+                                        <h6 class="mb-2">
+                                            Phase @phase.Number
+                                            <span class="badge @(phase.RunsInParallel ? "bg-success" : "bg-secondary")">
+                                                @(phase.RunsInParallel ? "Parallel" : "Sequential")
+                                            </span>
+                                        </h6>
+                                        <div class="row">
+                                            @foreach (var task in phase.Tasks)
+                                            {
+                                                <div class="col-12">
+                                                    <small class="d-block text-muted">
+                                                        <strong>@task.Id:</strong> @task.Description (@task.Assignee)
+                                                    </small>
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+
+                        <!-- Specialist Outputs -->
+                        <div class="card mb-4 border-success">
+                            <div class="card-header bg-success text-white">
+                                <h6 class="mb-0">✓ Agent Outputs (@Result.Outputs.Count)</h6>
+                            </div>
+                            <div class="card-body">
+                                @foreach (var response in Result.Outputs)
+                                {
+                                    <div class="mb-3 p-3 bg-light border rounded">
+                                        <h6 class="mb-2">
+                                            <span class="badge bg-primary">@response.Role</span>
+                                            <span class="badge bg-secondary">@(response.TaskId ?? "N/A")</span>
+                                        </h6>
+                                        <p class="mb-2">
+                                            <strong>Output:</strong> @response.Output
+                                        </p>
+
+                                        @if (response.Actions?.Any() == true)
+                                        {
+                                            <div class="mb-2">
+                                                <small class="d-block fw-bold">Actions Taken:</small>
+                                                <ul class="ms-3 mb-0">
+                                                    @foreach (var action in response.Actions)
+                                                    {
+                                                        <li><small>@action</small></li>
+                                                    }
+                                                </ul>
+                                            </div>
+                                        }
+
+                                        @if (response.Files?.Any() == true)
+                                        {
+                                            <div class="mb-0">
+                                                <small class="d-block fw-bold">Files Affected:</small>
+                                                <div class="ms-3">
+                                                    @foreach (var file in response.Files)
+                                                    {
+                                                        <code class="d-block text-secondary">@file</code>
+                                                    }
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </div>
+
+                        <!-- Audit Trail -->
+                        <div class="card border-secondary">
+                            <div class="card-header bg-secondary text-white">
+                                <h6 class="mb-0">📊 Audit Trail (@Result.AuditTrail.Count events)</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="list-group list-group-flush">
+                                    @foreach (var entry in Result.AuditTrail)
+                                    {
+                                        <div class="list-group-item px-0">
+                                            <div class="d-flex w-100 justify-content-between">
+                                                <small class="text-muted">
+                                                    <strong>@entry.TimestampUtc:G</strong>
+                                                </small>
+                                            </div>
+                                            <p class="mb-0 mt-1">@entry.Message</p>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Full Report -->
+                        <div class="card mt-4 border-dark">
+                            <div class="card-header bg-dark text-white">
+                                <h6 class="mb-0">📄 Complete Report</h6>
+                            </div>
+                            <div class="card-body">
+                                <pre class="bg-light p-3 rounded overflow-auto" style="max-height: 500px;">@Result.Report</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private string Objective = string.Empty;
+    private string OptionalContext = string.Empty;
+    private OrchestrationResult? Result;
+    private bool IsExecuting;
+    private string ErrorMessage = string.Empty;
+
+    private async Task ExecuteAsync()
+    {
+        ErrorMessage = string.Empty;
+        Result = null;
+        IsExecuting = true;
+
+        try
+        {
+            if (string.IsNullOrWhiteSpace(Objective))
+            {
+                ErrorMessage = "Please enter an objective before running the pipeline.";
+                return;
+            }
+
+            Result = await AgentsService.KickoffAsync(
+                Objective,
+                string.IsNullOrWhiteSpace(OptionalContext) ? null : OptionalContext);
+
+            Logger.LogInformation("Agent pipeline completed successfully.");
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+            Logger.LogError(ex, "Error executing agent pipeline: {Message}", ex.Message);
+        }
+        finally
+        {
+            IsExecuting = false;
+        }
+    }
+}
