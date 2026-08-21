@@ -1,8 +1,12 @@
 ﻿# HelpDesk
 
-A Help Desk / Ticket Management system built with **.NET 9**, **Blazor**, and **Entity Framework Core**.
+## AI‑Augmented Help Desk & Ticketing System
 
-This project demonstrates complex workflow architecture, domain-driven design, audit trail patterns, role-based access control, and clean separation of concerns — reflecting real-world practices used in high-integrity, regulated systems.
+HelpDesk is a modern **.NET 9**, **Blazor**, and **EF Core** application that demonstrates workflow architecture, domain‑driven design, audit trails, and role‑based access — enhanced with an embedded multi‑agent orchestration pipeline.
+
+The app includes a Planner, Designer, and Coder agent system capable of analyzing objectives, proposing UI/UX layouts, outlining architectural changes, and generating code scaffolding. This pipeline runs inside the application itself, providing an AI‑augmented development console that can help evolve and extend the system.
+
+This project serves as a portfolio‑grade example of integrating multi‑agent AI patterns into a real‑world enterprise application while maintaining clean architecture, strong typing, and production‑ready design.
 
 ---
 
