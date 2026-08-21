@@ -71,14 +71,14 @@ Key design goals:
    ```
 
 ### Project Structure
-
+```
 HelpDesk/
 ├── Domain/          # Entities, enums, domain logic
 ├── Application/     # Interfaces, DTOs, application services
 ├── Infrastructure/  # EF Core, Identity, repositories
 ├── HelpDesk/        # Blazor Web App (Presentation)
 └── README.md
-
+```
 ### Domain Highlights
 
 - Ticket is treated as an aggregate root
@@ -93,6 +93,14 @@ HelpDesk/
 - [ ] Background job example (auto-escalation)
 - [ ] Reporting (volume & resolution time)
 - [ ] Improved dashboard visualizations
+
+## 📸 Screenshots
+
+### Agent Pipeline Orchestrator
+![Agent Pipeline Screenshot](./screenshots/Agent_Pipeline_tab.png)
+
+*A development console inside the HelpDesk app that orchestrates Planner, Designer, and Coder agents.*
+
 
 ### License
 
