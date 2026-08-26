@@ -1,0 +1,633 @@
+@page "/tickets/{Id:int}"
+@rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
+@using System.Security.Claims
+@using HelpDesk.Application.Security
+@using HelpDesk.Application.Tickets
+@using HelpDesk.Application.Users
+@using HelpDesk.Domain.Tickets
+@using Microsoft.AspNetCore.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ITicketService TicketService
+@inject IUserAdministrationService UserAdministrationService
+@inject NavigationManager NavigationManager
+
+@attribute [Authorize]
+
+<PageTitle>Ticket Details</PageTitle>
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="h3 mb-0">Ticket Details</h1>
+        <button class="btn btn-outline-secondary" @onclick="BackToList">Back to Tickets</button>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+    {
+        <div class="alert alert-danger" role="alert">@ErrorMessage</div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(SuccessMessage))
+    {
+        <div class="alert alert-success" role="alert">@SuccessMessage</div>
+    }
+
+    @if (IsLoading)
+    {
+        <div class="d-flex align-items-center gap-2">
+            <div class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></div>
+            <span>Loading ticket...</span>
+        </div>
+    }
+    else if (EditModel is null)
+    {
+        <div class="alert alert-warning" role="alert">Ticket not found or unavailable.</div>
+    }
+    else
+    {
+        <div class="row g-4">
+            <div class="col-lg-8">
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>Ticket #@Id</span>
+                        <span class="badge @GetStatusBadgeClass(EditModel.Status)">@EditModel.Status</span>
+                    </div>
+                    <div class="card-body">
+                        <EditForm Model="EditModel" OnValidSubmit="SaveAsync">
+                            <DataAnnotationsValidator />
+                            <ValidationSummary />
+
+                            <div class="row g-3">
+                                <div class="col-md-8">
+                                    <label class="form-label">Title</label>
+                                    <InputText class="form-control" @bind-Value="EditModel.Title" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Category</label>
+                                    <InputSelect class="form-select" @bind-Value="EditModel.CategoryId">
+                                        @foreach (var category in Categories)
+                                        {
+                                            <option value="@category.Id">@category.Name</option>
+                                        }
+                                    </InputSelect>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Description</label>
+                                    <InputTextArea class="form-control" rows="6" @bind-Value="EditModel.Description" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Priority</label>
+                                    <InputSelect class="form-select" @bind-Value="EditModel.Priority">
+                                        @foreach (var priority in Enum.GetValues<TicketPriority>())
+                                        {
+                                            <option value="@priority">@priority</option>
+                                        }
+                                    </InputSelect>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Requester</label>
+                                    <input class="form-control" value="@EditModel.RequesterUserId" disabled />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Assigned To</label>
+                                    <input class="form-control" value="@(string.IsNullOrWhiteSpace(EditModel.AssignedUserId) ? "Unassigned" : EditModel.AssignedUserId)" disabled />
+                                </div>
+                            </div>
+
+                            <div class="text-muted small my-3">
+                                Created: @EditModel.CreatedAt.ToLocalTime().ToString("f")<br />
+                                Last Updated: @EditModel.UpdatedAt.ToLocalTime().ToString("f")
+                            </div>
+
+                            <div class="d-flex gap-2 flex-wrap">
+                                <button type="submit" class="btn btn-success" disabled="@IsBusy">Save Details</button>
+                                @if (CanDelete)
+                                {
+                                    <button type="button" class="btn btn-outline-danger" @onclick="DeleteAsync" disabled="@IsBusy">Soft Delete</button>
+                                }
+                            </div>
+                        </EditForm>
+                    </div>
+                </div>
+
+                @if (CanManageAssignments)
+                {
+                    <div class="card mb-4">
+                        <div class="card-header">Assignment</div>
+                        <div class="card-body">
+                            <div class="row g-3 align-items-end">
+                                <div class="col-md-8">
+                                    <label class="form-label">Assign to Agent</label>
+                                    <InputSelect class="form-select" @bind-Value="SelectedAgentId">
+                                        <option value="">Select agent</option>
+                                        @foreach (var agent in AssignableAgents)
+                                        {
+                                            <option value="@agent.UserId">@agent.Email</option>
+                                        }
+                                    </InputSelect>
+                                </div>
+                                <div class="col-md-4">
+                                    <button type="button" class="btn btn-outline-primary w-100" @onclick="AssignAsync" disabled="@(!CanAssign || IsBusy)">Assign / Reassign</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                <div class="card mb-4">
+                    <div class="card-header">Workflow Actions</div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Action Note</label>
+                            <InputTextArea class="form-control" rows="4" @bind-Value="ActionNote" />
+                            <div class="form-text">Use notes to explain assignment decisions, progress, abandonment, resolution, reopening, or close-out.</div>
+                        </div>
+
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="button" class="btn btn-primary" @onclick="ClaimAsync" disabled="@(!CanClaim || IsBusy)">Claim</button>
+                            <button type="button" class="btn btn-outline-primary" @onclick="StartWorkAsync" disabled="@(!CanStartWork || IsBusy)">Start Work</button>
+                            <button type="button" class="btn btn-outline-warning" @onclick="AbandonAsync" disabled="@(!CanAbandon || IsBusy)">Abandon</button>
+                            <button type="button" class="btn btn-outline-success" @onclick="ResolveAsync" disabled="@(!CanResolve || IsBusy)">Resolve</button>
+                            <button type="button" class="btn btn-success" @onclick="CloseAsync" disabled="@(!CanClose || IsBusy)">Close</button>
+                            <button type="button" class="btn btn-outline-secondary" @onclick="ReopenAsync" disabled="@(!CanReopen || IsBusy)">Reopen</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">Comments and Notes</div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Comment / Note</label>
+                            <InputTextArea class="form-control" rows="4" @bind-Value="CommentText" />
+                        </div>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button type="button" class="btn btn-outline-info" @onclick="AddPublicCommentAsync" disabled="@(!CanAddPublicComment || IsBusy)">Add Public Comment</button>
+                            @if (CanManageAssignments)
+                            {
+                                <button type="button" class="btn btn-outline-dark" @onclick="AddInternalNoteAsync" disabled="@IsBusy">Add Internal Note</button>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card mb-4">
+                    <div class="card-header">Workflow Summary</div>
+                    <div class="card-body">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-5">Status</dt>
+                            <dd class="col-sm-7">@EditModel.Status</dd>
+                            <dt class="col-sm-5">Category</dt>
+                            <dd class="col-sm-7">@EditModel.CategoryName</dd>
+                            <dt class="col-sm-5">Priority</dt>
+                            <dd class="col-sm-7">@EditModel.Priority</dd>
+                            <dt class="col-sm-5">Requester</dt>
+                            <dd class="col-sm-7">@EditModel.RequesterUserId</dd>
+                            <dt class="col-sm-5">Assigned</dt>
+                            <dd class="col-sm-7">@(string.IsNullOrWhiteSpace(EditModel.AssignedUserId) ? "Available" : EditModel.AssignedUserId)</dd>
+                            <dt class="col-sm-5">You</dt>
+                            <dd class="col-sm-7">@(CurrentUserName ?? CurrentUserId ?? "Unknown")</dd>
+                        </dl>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">Status History</div>
+                    <div class="card-body">
+                        @if (StatusHistory.Count == 0)
+                        {
+                            <p class="text-muted mb-0">No status transitions recorded.</p>
+                        }
+                        else
+                        {
+                            <div class="d-flex flex-column gap-3">
+                                @foreach (var item in StatusHistory)
+                                {
+                                    <div class="border rounded p-3">
+                                        <div class="fw-semibold">@item.FromStatus → @item.ToStatus</div>
+                                        <div class="small text-muted">@item.ChangedAt.ToLocalTime().ToString("g") by @item.ChangedByUserId</div>
+                                        @if (!string.IsNullOrWhiteSpace(item.Note))
+                                        {
+                                            <div class="mt-2">@item.Note</div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">Conversation</div>
+                    <div class="card-body">
+                        @if (TicketNotes.Count == 0)
+                        {
+                            <p class="text-muted mb-0">No comments or notes yet.</p>
+                        }
+                        else
+                        {
+                            <div class="d-flex flex-column gap-3">
+                                @foreach (var note in TicketNotes)
+                                {
+                                    <div class="border rounded p-3">
+                                        <div class="d-flex justify-content-between align-items-start mb-2">
+                                            <span class="badge @GetNoteBadgeClass(note.NoteType)">@note.NoteType</span>
+                                            <small class="text-muted">@note.CreatedAt.ToLocalTime().ToString("g")</small>
+                                        </div>
+                                        <div class="small text-muted mb-2">By: @(string.IsNullOrWhiteSpace(note.CreatedByUserId) ? "System" : note.CreatedByUserId)</div>
+                                        <div>@note.Body</div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private readonly List<TicketNote> TicketNotes = [];
+    private readonly List<TicketStatusHistory> StatusHistory = [];
+    private IReadOnlyList<TicketCategory> Categories = [];
+    private IReadOnlyList<UserSummary> AssignableAgents = [];
+    private bool IsLoading = true;
+    private bool IsSaving;
+    private bool IsActing;
+    private string? CurrentUserId;
+    private string? CurrentUserName;
+    private bool IsRequester;
+    private bool IsAgent;
+    private bool IsAdmin;
+    private string ActionNote = string.Empty;
+    private string CommentText = string.Empty;
+    private string SelectedAgentId = string.Empty;
+    private string? ErrorMessage;
+    private string? SuccessMessage;
+    private EditTicketModel? EditModel;
+
+    private bool IsBusy => IsLoading || IsSaving || IsActing;
+    private bool CanManageAssignments => IsAgent || IsAdmin;
+    private bool IsAssignedToCurrentUser => EditModel is not null && !string.IsNullOrWhiteSpace(CurrentUserId) && string.Equals(EditModel.AssignedUserId, CurrentUserId, StringComparison.Ordinal);
+    private bool IsRequesterOwner => EditModel is not null && !string.IsNullOrWhiteSpace(CurrentUserId) && string.Equals(EditModel.RequesterUserId, CurrentUserId, StringComparison.Ordinal);
+    private bool CanClaim => EditModel is not null && CanManageAssignments && !string.IsNullOrWhiteSpace(CurrentUserId) && string.IsNullOrWhiteSpace(EditModel.AssignedUserId) && EditModel.Status == TicketStatus.New;
+    private bool CanAssign => EditModel is not null && CanManageAssignments && !string.IsNullOrWhiteSpace(SelectedAgentId) && EditModel.Status is not TicketStatus.Closed and not TicketStatus.Resolved;
+    private bool CanStartWork => EditModel is not null && IsAssignedToCurrentUser && EditModel.Status == TicketStatus.Assigned;
+    private bool CanAbandon => EditModel is not null && IsAssignedToCurrentUser && EditModel.Status is TicketStatus.Assigned or TicketStatus.InProgress;
+    private bool CanResolve => EditModel is not null && IsAssignedToCurrentUser && EditModel.Status == TicketStatus.InProgress;
+    private bool CanClose => EditModel is not null && IsAssignedToCurrentUser && EditModel.Status == TicketStatus.Resolved;
+    private bool CanReopen => EditModel is not null && (CanManageAssignments || IsRequesterOwner) && EditModel.Status is TicketStatus.Resolved or TicketStatus.Closed;
+    private bool CanAddPublicComment => EditModel is not null && (CanManageAssignments || IsRequesterOwner);
+    private bool CanDelete => EditModel is not null && (IsAdmin || (IsRequesterOwner && EditModel.Status == TicketStatus.New));
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadPageAsync();
+    }
+
+    private async Task LoadPageAsync()
+    {
+        IsLoading = true;
+        ErrorMessage = null;
+
+        try
+        {
+            await LoadCurrentUserAsync();
+            Categories = await TicketService.GetCategoriesAsync();
+            AssignableAgents = CanManageAssignments ? await UserAdministrationService.GetAssignableAgentsAsync() : [];
+
+            var ticket = await TicketService.GetByIdAsync(Id, CurrentUserId ?? string.Empty, IsAgent, IsAdmin);
+            if (ticket is null)
+            {
+                EditModel = null;
+                TicketNotes.Clear();
+                StatusHistory.Clear();
+                return;
+            }
+
+            ApplyTicket(ticket);
+            SelectedAgentId = ticket.AssignedUserId ?? string.Empty;
+
+            TicketNotes.Clear();
+            TicketNotes.AddRange(await TicketService.GetNotesAsync(Id, CanManageAssignments));
+
+            StatusHistory.Clear();
+            StatusHistory.AddRange(await TicketService.GetStatusHistoryAsync(Id));
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Unable to load ticket: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task LoadCurrentUserAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        CurrentUserId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        CurrentUserName = user.Identity?.Name ?? user.FindFirst(ClaimTypes.Email)?.Value ?? CurrentUserId;
+        IsRequester = user.IsInRole(ApplicationRoles.Requester);
+        IsAgent = user.IsInRole(ApplicationRoles.Agent);
+        IsAdmin = user.IsInRole(ApplicationRoles.Admin);
+    }
+
+    private async Task SaveAsync()
+    {
+        if (EditModel is null || string.IsNullOrWhiteSpace(CurrentUserId))
+        {
+            return;
+        }
+
+        IsSaving = true;
+        ErrorMessage = null;
+        SuccessMessage = null;
+
+        try
+        {
+            var updated = await TicketService.UpdateDetailsAsync(
+                Id,
+                EditModel.Title,
+                EditModel.Description,
+                EditModel.CategoryId,
+                EditModel.Priority,
+                CurrentUserId,
+                CanManageAssignments);
+
+            if (updated is null)
+            {
+                ErrorMessage = "Ticket no longer exists.";
+                return;
+            }
+
+            ApplyTicket(updated);
+            SuccessMessage = "Ticket details updated successfully.";
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+
+    private Task ClaimAsync()
+        => RunTicketActionAsync(async userId =>
+        {
+            SuccessMessage = "Ticket claimed.";
+            return await TicketService.AssignAsync(Id, userId, userId, CanManageAssignments, ActionNote);
+        });
+
+    private Task AssignAsync()
+        => RunTicketActionAsync(async userId =>
+        {
+            SuccessMessage = "Ticket assignment updated.";
+            return await TicketService.AssignAsync(Id, userId, SelectedAgentId, CanManageAssignments, ActionNote);
+        });
+
+    private Task StartWorkAsync()
+        => RunTicketActionAsync(async userId =>
+        {
+            SuccessMessage = "Ticket moved to in progress.";
+            return await TicketService.StartWorkAsync(Id, userId, ActionNote);
+        });
+
+    private Task AbandonAsync()
+        => RunTicketActionAsync(async userId =>
+        {
+            SuccessMessage = "Ticket returned to the pool.";
+            return await TicketService.AbandonAsync(Id, userId, ActionNote);
+        });
+
+    private Task ResolveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(ActionNote))
+        {
+            ErrorMessage = "Enter a resolution note before resolving the ticket.";
+            return Task.CompletedTask;
+        }
+
+        return RunTicketActionAsync(async userId =>
+        {
+            SuccessMessage = "Ticket resolved.";
+            return await TicketService.ResolveAsync(Id, userId, ActionNote);
+        });
+    }
+
+    private Task CloseAsync()
+        => RunTicketActionAsync(async userId =>
+        {
+            SuccessMessage = "Ticket closed.";
+            return await TicketService.CloseAsync(Id, userId, ActionNote);
+        });
+
+    private Task ReopenAsync()
+        => RunTicketActionAsync(async userId =>
+        {
+            SuccessMessage = "Ticket reopened.";
+            return await TicketService.ReopenAsync(Id, userId, ActionNote, CanManageAssignments);
+        });
+
+    private async Task AddPublicCommentAsync()
+    {
+        await AddCommentAsync(isInternal: false);
+    }
+
+    private async Task AddInternalNoteAsync()
+    {
+        await AddCommentAsync(isInternal: true);
+    }
+
+    private async Task AddCommentAsync(bool isInternal)
+    {
+        if (string.IsNullOrWhiteSpace(CurrentUserId))
+        {
+            ErrorMessage = "A signed-in user is required.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(CommentText))
+        {
+            ErrorMessage = isInternal ? "Enter an internal note." : "Enter a public comment.";
+            return;
+        }
+
+        IsActing = true;
+        ErrorMessage = null;
+        SuccessMessage = null;
+
+        try
+        {
+            var note = await TicketService.AddCommentAsync(Id, CurrentUserId, CommentText, isInternal, CanManageAssignments, CanManageAssignments);
+            if (note is null)
+            {
+                ErrorMessage = "Ticket no longer exists.";
+                return;
+            }
+
+            CommentText = string.Empty;
+            SuccessMessage = isInternal ? "Internal note added." : "Public comment added.";
+            await RefreshSidePanelsAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsActing = false;
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (string.IsNullOrWhiteSpace(CurrentUserId))
+        {
+            return;
+        }
+
+        IsActing = true;
+        ErrorMessage = null;
+        SuccessMessage = null;
+
+        try
+        {
+            var deleted = await TicketService.SoftDeleteAsync(Id, CurrentUserId, IsAdmin);
+            if (!deleted)
+            {
+                ErrorMessage = "Ticket no longer exists.";
+                return;
+            }
+
+            NavigationManager.NavigateTo("/tickets");
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsActing = false;
+        }
+    }
+
+    private async Task RunTicketActionAsync(Func<string, Task<Ticket?>> action)
+    {
+        if (string.IsNullOrWhiteSpace(CurrentUserId))
+        {
+            ErrorMessage = "A signed-in user is required for this action.";
+            return;
+        }
+
+        IsActing = true;
+        ErrorMessage = null;
+        SuccessMessage = null;
+
+        try
+        {
+            var updated = await action(CurrentUserId);
+            if (updated is null)
+            {
+                ErrorMessage = "Ticket no longer exists.";
+                return;
+            }
+
+            ApplyTicket(updated);
+            SelectedAgentId = updated.AssignedUserId ?? string.Empty;
+            ActionNote = string.Empty;
+            await RefreshSidePanelsAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsActing = false;
+        }
+    }
+
+    private async Task RefreshSidePanelsAsync()
+    {
+        TicketNotes.Clear();
+        TicketNotes.AddRange(await TicketService.GetNotesAsync(Id, CanManageAssignments));
+
+        StatusHistory.Clear();
+        StatusHistory.AddRange(await TicketService.GetStatusHistoryAsync(Id));
+    }
+
+    private void ApplyTicket(Ticket ticket)
+    {
+        EditModel = new EditTicketModel
+        {
+            Title = ticket.Title,
+            Description = ticket.Description,
+            CategoryId = ticket.CategoryId,
+            CategoryName = ticket.Category.Name,
+            Status = ticket.Status,
+            Priority = ticket.Priority,
+            RequesterUserId = ticket.RequesterUserId,
+            AssignedUserId = ticket.AssignedUserId,
+            CreatedAt = ticket.CreatedAt,
+            UpdatedAt = ticket.UpdatedAt
+        };
+    }
+
+    private static string GetStatusBadgeClass(TicketStatus status)
+        => status switch
+        {
+            TicketStatus.New => "bg-secondary",
+            TicketStatus.Assigned => "bg-info text-dark",
+            TicketStatus.InProgress => "bg-primary",
+            TicketStatus.Resolved => "bg-success",
+            TicketStatus.Closed => "bg-dark",
+            _ => "bg-secondary"
+        };
+
+    private static string GetNoteBadgeClass(TicketNoteType noteType)
+        => noteType switch
+        {
+            TicketNoteType.PublicComment => "bg-info text-dark",
+            TicketNoteType.InternalNote => "bg-dark",
+            TicketNoteType.Resolution => "bg-success",
+            TicketNoteType.System => "bg-secondary",
+            _ => "bg-secondary"
+        };
+
+    private void BackToList()
+    {
+        NavigationManager.NavigateTo("/tickets");
+    }
+
+    private sealed class EditTicketModel
+    {
+        [Required]
+        [StringLength(200, MinimumLength = 3)]
+        public string Title { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(4000, MinimumLength = 5)]
+        public string Description { get; set; } = string.Empty;
+
+        [Range(1, int.MaxValue)]
+        public int CategoryId { get; set; }
+
+        public string CategoryName { get; set; } = string.Empty;
+        public TicketStatus Status { get; set; } = TicketStatus.New;
+        public TicketPriority Priority { get; set; } = TicketPriority.Medium;
+        public string RequesterUserId { get; set; } = string.Empty;
+        public string? AssignedUserId { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
+    }
+}

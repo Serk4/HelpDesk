@@ -1,16 +1,14 @@
 @page "/agents"
 @using HelpDesk.Application.Agents
-@using HelpDesk.Application.Services
-@inject IAgentsService AgentsService
 @inject ILogger<Agents> Logger
 
-<PageTitle>Agent Pipeline Orchestrator</PageTitle>
+<PageTitle>Agent Pipeline Orchestrator (Demo)</PageTitle>
 
 <div class="container mt-5">
     <div class="row">
         <div class="col-lg-12">
             <h1 class="mb-4">
-                <i class="bi bi-robot"></i> Agent Pipeline Orchestrator
+                <i class="bi bi-robot"></i> Agent Pipeline Orchestrator (Demo)
             </h1>
 
             <!-- Input Section -->
@@ -27,7 +25,8 @@
                             rows="4"
                             placeholder="Enter your objective (e.g., 'Create a user management dashboard')"
                             @bind="Objective"
-                            disabled="@IsExecuting" />
+                            @bind:event="oninput"
+                            disabled="@IsExecuting"></textarea>
                         <small class="text-muted">
                             Describe what you want the agents to design, code, and integrate.
                         </small>
@@ -41,7 +40,8 @@
                             rows="3"
                             placeholder="Additional context for the agents (optional)"
                             @bind="OptionalContext"
-                            disabled="@IsExecuting" />
+                            @bind:event="oninput"
+                            disabled="@IsExecuting"></textarea>
                         <small class="text-muted">
                             Provide any additional context about requirements, constraints, or dependencies.
                         </small>
@@ -76,9 +76,31 @@
                 <!-- Results Section -->
                 <div class="card mb-4 border-success">
                     <div class="card-header bg-success text-white">
-                        <h5 class="mb-0">✓ Orchestration Results</h5>
+                        <h5 class="mb-0">✓ Demo Orchestration Results</h5>
                     </div>
                     <div class="card-body">
+                        <div class="alert alert-warning" role="alert">
+                            <h6 class="alert-heading mb-2">Demo Mode</h6>
+                            <p class="mb-2">@DemoSummary</p>
+                            <hr />
+                            <p class="mb-1"><strong>Objective:</strong> @Objective</p>
+                            <p class="mb-0"><strong>Optional Context:</strong> @(string.IsNullOrWhiteSpace(OptionalContext) ? "(none provided)" : OptionalContext)</p>
+                        </div>
+
+                        <div class="card mb-4 border-primary">
+                            <div class="card-header bg-primary text-white">
+                                <h6 class="mb-0">What would happen with real LLM wiring</h6>
+                            </div>
+                            <div class="card-body">
+                                <ul class="mb-0">
+                                    @foreach (var item in DemoWhatWouldHappen)
+                                    {
+                                        <li>@item</li>
+                                    }
+                                </ul>
+                            </div>
+                        </div>
+
                         <!-- Objective Summary -->
                         <div class="alert alert-info" role="alert">
                             <strong>Objective:</strong> @Result.Objective
@@ -189,6 +211,70 @@
                             </div>
                         </div>
 
+                        <!-- Designer Output -->
+                        @if (DemoDesignerOutput is not null)
+                        {
+                            <div class="card mb-4 border-success">
+                                <div class="card-header bg-success text-white">
+                                    <h6 class="mb-0">🎨 DesignerOutput</h6>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Summary:</strong> @DemoDesignerOutput.Summary</p>
+
+                                    <h6 class="mt-3 mb-2">UI Components</h6>
+                                    <ul>
+                                        @foreach (var component in DemoDesignerOutput.Components)
+                                        {
+                                            <li><strong>@component.Name</strong> - dependencies: @string.Join(", ", component.Dependencies)</li>
+                                        }
+                                    </ul>
+
+                                    @if (DemoDesignerOutput.InteractionPatterns.Any())
+                                    {
+                                        <h6 class="mt-3 mb-2">Interaction Patterns</h6>
+                                        <ul>
+                                            @foreach (var pattern in DemoDesignerOutput.InteractionPatterns)
+                                            {
+                                                <li>@pattern</li>
+                                            }
+                                        </ul>
+                                    }
+                                </div>
+                            </div>
+                        }
+
+                        <!-- Coder Output -->
+                        @if (DemoCoderOutput is not null)
+                        {
+                            <div class="card mb-4 border-success">
+                                <div class="card-header bg-success text-white">
+                                    <h6 class="mb-0">💻 CoderOutput</h6>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Summary:</strong> @DemoCoderOutput.Summary</p>
+
+                                    <h6 class="mt-3 mb-2">Code Scaffolding Preview</h6>
+                                    <ul>
+                                        @foreach (var change in DemoCoderOutput.Changes)
+                                        {
+                                            <li><strong>@change.FilePath</strong> - @change.Description</li>
+                                        }
+                                    </ul>
+
+                                    @if (DemoCoderOutput.Warnings.Any())
+                                    {
+                                        <h6 class="mt-3 mb-2">Notes</h6>
+                                        <ul>
+                                            @foreach (var warning in DemoCoderOutput.Warnings)
+                                            {
+                                                <li>@warning</li>
+                                            }
+                                        </ul>
+                                    }
+                                </div>
+                            </div>
+                        }
+
                         <!-- Specialist Outputs -->
                         <div class="card mb-4 border-success">
                             <div class="card-header bg-success text-white">
@@ -205,32 +291,6 @@
                                         <p class="mb-2">
                                             <strong>Output:</strong> @response.Output
                                         </p>
-
-                                        @if (response.Actions?.Any() == true)
-                                        {
-                                            <div class="mb-2">
-                                                <small class="d-block fw-bold">Actions Taken:</small>
-                                                <ul class="ms-3 mb-0">
-                                                    @foreach (var action in response.Actions)
-                                                    {
-                                                        <li><small>@action</small></li>
-                                                    }
-                                                </ul>
-                                            </div>
-                                        }
-
-                                        @if (response.Files?.Any() == true)
-                                        {
-                                            <div class="mb-0">
-                                                <small class="d-block fw-bold">Files Affected:</small>
-                                                <div class="ms-3">
-                                                    @foreach (var file in response.Files)
-                                                    {
-                                                        <code class="d-block text-secondary">@file</code>
-                                                    }
-                                                </div>
-                                            </div>
-                                        }
                                     </div>
                                 }
                             </div>
@@ -278,13 +338,19 @@
     private string Objective = string.Empty;
     private string OptionalContext = string.Empty;
     private OrchestrationResult? Result;
+    private DesignerOutput? DemoDesignerOutput;
+    private CoderOutput? DemoCoderOutput;
     private bool IsExecuting;
     private string ErrorMessage = string.Empty;
+    private string DemoSummary = string.Empty;
+    private IReadOnlyList<string> DemoWhatWouldHappen = [];
 
     private async Task ExecuteAsync()
     {
         ErrorMessage = string.Empty;
         Result = null;
+        DemoDesignerOutput = null;
+        DemoCoderOutput = null;
         IsExecuting = true;
 
         try
@@ -295,20 +361,117 @@
                 return;
             }
 
-            Result = await AgentsService.KickoffAsync(
-                Objective,
-                string.IsNullOrWhiteSpace(OptionalContext) ? null : OptionalContext);
+            var plannerOutput = new PlannerOutput(
+                Summary: "Demo planner output generated locally in the UI.",
+                Steps:
+                [
+                    new("step-1", AgentRole.Planner, "Analyze objective and break it into delivery milestones.", ["PRD.md"]),
+                    new("step-2", AgentRole.Designer, "Propose Blazor component layout and user flow.", ["Components/Pages/Agents.razor"], ["step-1"]),
+                    new("step-3", AgentRole.Coder, "Scaffold application/service contracts and integration points.", ["Application/"], ["step-1", "step-2"])
+                ],
+                EdgeCases:
+                [
+                    "Missing objective details can lead to ambiguous plans.",
+                    "Conflicting constraints may require trade-off decisions."
+                ],
+                OpenQuestions:
+                [
+                    "Should generated code prioritize speed or extensibility first?"
+                ]);
 
-            Logger.LogInformation("Agent pipeline completed successfully.");
+            DemoDesignerOutput = new DesignerOutput(
+                Summary: "If wired to an LLM, the Designer agent would suggest page composition, UX hierarchy, and accessibility guidance.",
+                Components:
+                [
+                    new("ObjectiveInputPanel", "<section>...</section>", ["Bootstrap form controls"]),
+                    new("PipelineResultsPanel", "<section>...</section>", ["Cards", "Badges", "Alert components"])
+                ],
+                Styles: ["Consistent spacing scale", "Readable card hierarchy"],
+                InteractionPatterns:
+                [
+                    "Guide users through objective entry before running pipeline.",
+                    "Show progress and clearly separate planner/designer/coder result areas."
+                ],
+                AccessibilityConsiderations:
+                [
+                    "Use semantic headings and labels.",
+                    "Provide status text for loading state and errors."
+                ],
+                RequiresUserTesting: true);
+
+            DemoCoderOutput = new CoderOutput(
+                Summary: "If wired to an LLM, the Coder agent would scaffold service calls, DTO mapping, and component state handling.",
+                Changes:
+                [
+                    new("Application/Services/AgentsService.cs", "Scaffold service method signatures for kickoff and result mapping.", ["KickoffAsync", "error handling"]),
+                    new("Components/Pages/Agents.razor", "Scaffold UI state transitions and rendering for each output section.", ["ExecuteAsync", "result cards"])
+                ],
+                TestCasesGenerated:
+                [
+                    "Objective is required before submit.",
+                    "Demo output renders planner, designer, coder, and audit sections."
+                ],
+                Dependencies: ["System.Net.Http.Json"],
+                Warnings:
+                [
+                    "Demo mode only: no backend pipeline or LLM call is executed.",
+                    "No project files are modified by this action."
+                ],
+                RequiresReview: true);
+
+            var audit = new List<AuditEntry>
+            {
+                new(DateTimeOffset.UtcNow, "Demo kickoff received from UI."),
+                new(DateTimeOffset.UtcNow, "Demo PlannerOutput prepared locally."),
+                new(DateTimeOffset.UtcNow, "Demo DesignerOutput prepared locally."),
+                new(DateTimeOffset.UtcNow, "Demo CoderOutput prepared locally."),
+                new(DateTimeOffset.UtcNow, "Demo pipeline completed. No backend agents were invoked.")
+            };
+
+            var outputs = new List<AgentResponse>
+            {
+                new(AgentRole.Planner, plannerOutput.Summary, plannerOutput.Steps.Select(s => s.Description).ToList(), "step-1", ["PRD.md"]),
+                new(AgentRole.Designer, DemoDesignerOutput.Summary, DemoDesignerOutput.InteractionPatterns, "step-2", ["Components/Pages/Agents.razor"]),
+                new(AgentRole.Coder, DemoCoderOutput.Summary, DemoCoderOutput.Changes.Select(c => c.Description).ToList(), "step-3", DemoCoderOutput.Changes.Select(c => c.FilePath).ToList())
+            };
+
+            DemoSummary = "This is a demonstration response. No real feature generation, no real code synthesis, and no file changes will occur.";
+            DemoWhatWouldHappen =
+            [
+                "Planner agent would interpret your objective and create sequenced execution steps.",
+                "Designer agent would propose Blazor page layout suggestions, interaction patterns, and accessibility checks.",
+                "Coder agent would scaffold code structure, service contracts, and implementation tasks for developer review."
+            ];
+
+            var report = string.Join(Environment.NewLine,
+            [
+                "## Demo Agent Pipeline Result",
+                $"Objective: {Objective}",
+                $"Optional Context: {(string.IsNullOrWhiteSpace(OptionalContext) ? "(none provided)" : OptionalContext)}",
+                string.Empty,
+                "This is a UI-only demonstration. No backend or LLM execution was performed."
+            ]);
+
+            Result = new OrchestrationResult(
+                Objective,
+                plannerOutput,
+                [new ExecutionPhase(1, plannerOutput.Steps, false, [])],
+                outputs,
+                audit,
+                report);
+
+            Logger.LogInformation("Demo pipeline response generated locally.");
         }
         catch (Exception ex)
         {
             ErrorMessage = ex.Message;
-            Logger.LogError(ex, "Error executing agent pipeline: {Message}", ex.Message);
+            Logger.LogError(ex, "Error generating demo pipeline response: {Message}", ex.Message);
         }
         finally
         {
             IsExecuting = false;
         }
+
+        await InvokeAsync(StateHasChanged);
     }
 }

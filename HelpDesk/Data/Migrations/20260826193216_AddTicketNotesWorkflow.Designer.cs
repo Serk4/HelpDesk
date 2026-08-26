@@ -4,6 +4,7 @@ using HelpDesk.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace HelpDesk.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260826193216_AddTicketNotesWorkflow")]
+    partial class AddTicketNotesWorkflow
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -99,40 +102,16 @@ namespace HelpDesk.Migrations
                         .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
 
-                    b.Property<int>("CategoryId")
-                        .HasColumnType("int");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("DeletedByUserId")
-                        .HasMaxLength(450)
-                        .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(4000)
                         .HasColumnType("nvarchar(4000)");
 
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
                     b.Property<int>("Priority")
                         .HasColumnType("int");
-
-                    b.Property<string>("RequesterUserId")
-                        .IsRequired()
-                        .HasMaxLength(450)
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<byte[]>("RowVersion")
-                        .IsConcurrencyToken()
-                        .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("rowversion");
 
                     b.Property<int>("Status")
                         .HasColumnType("int");
@@ -149,92 +128,11 @@ namespace HelpDesk.Migrations
 
                     b.HasIndex("AssignedUserId");
 
-                    b.HasIndex("CategoryId");
-
                     b.HasIndex("Priority");
-
-                    b.HasIndex("RequesterUserId");
 
                     b.HasIndex("Status");
 
-                    b.HasIndex("UpdatedAt");
-
-                    b.HasIndex("Status", "Priority", "CategoryId");
-
                     b.ToTable("Tickets", (string)null);
-                });
-
-            modelBuilder.Entity("HelpDesk.Domain.Tickets.TicketCategory", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Name")
-                        .IsUnique();
-
-                    b.ToTable("TicketCategories", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            Description = "Login, access, or account management issues.",
-                            IsActive = true,
-                            Name = "Account"
-                        },
-                        new
-                        {
-                            Id = 2,
-                            Description = "Laptop, monitor, printer, and other physical device issues.",
-                            IsActive = true,
-                            Name = "Hardware"
-                        },
-                        new
-                        {
-                            Id = 3,
-                            Description = "Application support, installations, and errors.",
-                            IsActive = true,
-                            Name = "Software"
-                        },
-                        new
-                        {
-                            Id = 4,
-                            Description = "Connectivity, VPN, and network performance issues.",
-                            IsActive = true,
-                            Name = "Network"
-                        },
-                        new
-                        {
-                            Id = 5,
-                            Description = "Security concerns, suspicious activity, or policy issues.",
-                            IsActive = true,
-                            Name = "Security"
-                        },
-                        new
-                        {
-                            Id = 6,
-                            Description = "General requests that do not fit another category.",
-                            IsActive = true,
-                            Name = "Other"
-                        });
                 });
 
             modelBuilder.Entity("HelpDesk.Domain.Tickets.TicketNote", b =>
@@ -257,9 +155,6 @@ namespace HelpDesk.Migrations
                         .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
 
-                    b.Property<bool>("IsInternal")
-                        .HasColumnType("bit");
-
                     b.Property<int>("NoteType")
                         .HasColumnType("int");
 
@@ -272,47 +167,7 @@ namespace HelpDesk.Migrations
 
                     b.HasIndex("TicketId");
 
-                    b.HasIndex("TicketId", "IsInternal");
-
                     b.ToTable("TicketNotes", (string)null);
-                });
-
-            modelBuilder.Entity("HelpDesk.Domain.Tickets.TicketStatusHistory", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("ChangedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("ChangedByUserId")
-                        .IsRequired()
-                        .HasMaxLength(450)
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<int>("FromStatus")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Note")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<int>("TicketId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("ToStatus")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ChangedAt");
-
-                    b.HasIndex("TicketId");
-
-                    b.ToTable("TicketStatusHistory", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
@@ -448,32 +303,10 @@ namespace HelpDesk.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
-            modelBuilder.Entity("HelpDesk.Domain.Tickets.Ticket", b =>
-                {
-                    b.HasOne("HelpDesk.Domain.Tickets.TicketCategory", "Category")
-                        .WithMany("Tickets")
-                        .HasForeignKey("CategoryId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Category");
-                });
-
             modelBuilder.Entity("HelpDesk.Domain.Tickets.TicketNote", b =>
                 {
                     b.HasOne("HelpDesk.Domain.Tickets.Ticket", "Ticket")
                         .WithMany("Notes")
-                        .HasForeignKey("TicketId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Ticket");
-                });
-
-            modelBuilder.Entity("HelpDesk.Domain.Tickets.TicketStatusHistory", b =>
-                {
-                    b.HasOne("HelpDesk.Domain.Tickets.Ticket", "Ticket")
-                        .WithMany("StatusHistory")
                         .HasForeignKey("TicketId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -535,13 +368,6 @@ namespace HelpDesk.Migrations
             modelBuilder.Entity("HelpDesk.Domain.Tickets.Ticket", b =>
                 {
                     b.Navigation("Notes");
-
-                    b.Navigation("StatusHistory");
-                });
-
-            modelBuilder.Entity("HelpDesk.Domain.Tickets.TicketCategory", b =>
-                {
-                    b.Navigation("Tickets");
                 });
 #pragma warning restore 612, 618
         }

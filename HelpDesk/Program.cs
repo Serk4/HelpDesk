@@ -1,5 +1,8 @@
 using HelpDesk.Application.Agents;
+using HelpDesk.Application.Security;
 using HelpDesk.Application.Services;
+using HelpDesk.Application.Tickets;
+using HelpDesk.Application.Users;
 using HelpDesk.Components;
 using HelpDesk.Components.Account;
 using HelpDesk.Data;
@@ -31,11 +34,14 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 builder.Services.AddIdentityCore<ApplicationUser>(options => options.SignIn.RequireConfirmedAccount = true)
+    .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddSignInManager()
     .AddDefaultTokenProviders();
 
 builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
+builder.Services.AddScoped<ITicketService, TicketService>();
+builder.Services.AddScoped<IUserAdministrationService, UserAdministrationService>();
 
 // Agent registrations
 builder.Services.AddScoped<IAgent, PlannerAgent>();
@@ -50,6 +56,18 @@ builder.Services.AddScoped<OrchestratorAgent>();
 builder.Services.AddHttpClient<IAgentsService, AgentsService>();
 
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+    foreach (var role in ApplicationRoles.All)
+    {
+        if (!await roleManager.RoleExistsAsync(role))
+        {
+            await roleManager.CreateAsync(new IdentityRole(role));
+        }
+    }
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

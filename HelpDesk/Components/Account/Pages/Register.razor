@@ -3,10 +3,13 @@
 @using System.ComponentModel.DataAnnotations
 @using System.Text
 @using System.Text.Encodings.Web
+@using HelpDesk.Application.Security
 @using Microsoft.AspNetCore.Identity
 @using Microsoft.AspNetCore.WebUtilities
 @using HelpDesk.Data
+@using Microsoft.EntityFrameworkCore
 
+@inject RoleManager<IdentityRole> RoleManager
 @inject UserManager<ApplicationUser> UserManager
 @inject IUserStore<ApplicationUser> UserStore
 @inject SignInManager<ApplicationUser> SignInManager
@@ -68,6 +71,7 @@
     public async Task RegisterUser(EditContext editContext)
     {
         var user = CreateUser();
+        var isFirstUser = !await UserManager.Users.AnyAsync();
 
         await UserStore.SetUserNameAsync(user, Input.Email, CancellationToken.None);
         var emailStore = GetEmailStore();
@@ -77,6 +81,25 @@
         if (!result.Succeeded)
         {
             identityErrors = result.Errors;
+            return;
+        }
+
+        foreach (var role in ApplicationRoles.All)
+        {
+            if (!await RoleManager.RoleExistsAsync(role))
+            {
+                await RoleManager.CreateAsync(new IdentityRole(role));
+            }
+        }
+
+        var assignedRoles = isFirstUser
+            ? new[] { ApplicationRoles.Requester, ApplicationRoles.Agent, ApplicationRoles.Admin }
+            : new[] { ApplicationRoles.Requester };
+
+        var roleResult = await UserManager.AddToRolesAsync(user, assignedRoles);
+        if (!roleResult.Succeeded)
+        {
+            identityErrors = roleResult.Errors;
             return;
         }
 

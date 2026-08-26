@@ -1,0 +1,154 @@
+@page "/admin/users"
+@rendermode InteractiveServer
+@using HelpDesk.Application.Security
+@using HelpDesk.Application.Users
+@using Microsoft.AspNetCore.Authorization
+@inject IUserAdministrationService UserAdministrationService
+
+@attribute [Authorize(Roles = ApplicationRoles.Admin)]
+
+<PageTitle>User Administration</PageTitle>
+
+<div class="container mt-4">
+    <h1 class="h3 mb-3">User Administration</h1>
+    <p class="text-muted">Manage HelpDesk access by assigning Requester, Agent, and Admin roles.</p>
+
+    @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+    {
+        <div class="alert alert-danger" role="alert">@ErrorMessage</div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(SuccessMessage))
+    {
+        <div class="alert alert-success" role="alert">@SuccessMessage</div>
+    }
+
+    @if (IsLoading)
+    {
+        <div class="d-flex align-items-center gap-2">
+            <div class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></div>
+            <span>Loading users...</span>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-striped align-middle">
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Requester</th>
+                        <th>Agent</th>
+                        <th>Admin</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var user in Users)
+                    {
+                        <tr>
+                            <td>@user.Email</td>
+                            <td><input type="checkbox" checked="@RoleSelections[user.UserId].Requester" @onchange="e => UpdateSelection(user.UserId, RoleKind.Requester, e.Value)" /></td>
+                            <td><input type="checkbox" checked="@RoleSelections[user.UserId].Agent" @onchange="e => UpdateSelection(user.UserId, RoleKind.Agent, e.Value)" /></td>
+                            <td><input type="checkbox" checked="@RoleSelections[user.UserId].Admin" @onchange="e => UpdateSelection(user.UserId, RoleKind.Admin, e.Value)" /></td>
+                            <td><button class="btn btn-sm btn-primary" @onclick="() => SaveRolesAsync(user.UserId)">Save</button></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private readonly List<UserSummary> Users = [];
+    private readonly Dictionary<string, RoleSelection> RoleSelections = [];
+    private bool IsLoading = true;
+    private string? ErrorMessage;
+    private string? SuccessMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        IsLoading = true;
+        ErrorMessage = null;
+        SuccessMessage = null;
+
+        try
+        {
+            var users = await UserAdministrationService.GetUsersAsync();
+            Users.Clear();
+            Users.AddRange(users);
+
+            RoleSelections.Clear();
+            foreach (var user in users)
+            {
+                RoleSelections[user.UserId] = new RoleSelection(
+                    user.Roles.Contains(ApplicationRoles.Requester),
+                    user.Roles.Contains(ApplicationRoles.Agent),
+                    user.Roles.Contains(ApplicationRoles.Admin));
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private void UpdateSelection(string userId, RoleKind role, object? value)
+    {
+        if (!RoleSelections.TryGetValue(userId, out var selection))
+        {
+            return;
+        }
+
+        var isChecked = value as bool? == true;
+        RoleSelections[userId] = role switch
+        {
+            RoleKind.Requester => selection with { Requester = isChecked },
+            RoleKind.Agent => selection with { Agent = isChecked },
+            RoleKind.Admin => selection with { Admin = isChecked },
+            _ => selection
+        };
+    }
+
+    private async Task SaveRolesAsync(string userId)
+    {
+        ErrorMessage = null;
+        SuccessMessage = null;
+
+        try
+        {
+            var selection = RoleSelections[userId];
+            var roles = new List<string>();
+            if (selection.Requester) roles.Add(ApplicationRoles.Requester);
+            if (selection.Agent) roles.Add(ApplicationRoles.Agent);
+            if (selection.Admin) roles.Add(ApplicationRoles.Admin);
+
+            await UserAdministrationService.UpdateRolesAsync(userId, roles);
+            SuccessMessage = "Roles updated.";
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+    }
+
+    private enum RoleKind
+    {
+        Requester,
+        Agent,
+        Admin
+    }
+
+    private sealed record RoleSelection(bool Requester, bool Agent, bool Admin);
+}

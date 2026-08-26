@@ -1,7 +1,168 @@
 ﻿@page "/"
+@rendermode InteractiveServer
+@using System.Security.Claims
+@using HelpDesk.Application.Security
+@using HelpDesk.Application.Tickets
+@using HelpDesk.Domain.Tickets
+@using Microsoft.AspNetCore.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ITicketService TicketService
+
+@attribute [Authorize]
 
 <PageTitle>Home</PageTitle>
 
-<h1>Hello, world!</h1>
+<div class="container mt-4">
+    <h1 class="display-6 mb-2">HelpDesk Dashboard</h1>
+    <p class="lead text-muted">
+        Professional ticket tracking for requesters, support agents, and administrators.
+    </p>
 
-Welcome to your new app.
+    @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+    {
+        <div class="alert alert-warning" role="alert">@ErrorMessage</div>
+    }
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card h-100 border-primary">
+                <div class="card-body">
+                    <div class="text-muted small">Visible Tickets</div>
+                    <div class="fs-3 fw-semibold">@Dashboard.TotalTickets</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100 border-warning">
+                <div class="card-body">
+                    <div class="text-muted small">Open Tickets</div>
+                    <div class="fs-3 fw-semibold">@Dashboard.OpenTickets</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100 border-info">
+                <div class="card-body">
+                    <div class="text-muted small">My Requested</div>
+                    <div class="fs-3 fw-semibold">@Dashboard.MyRequestedTickets</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100 border-danger">
+                <div class="card-body">
+                    <div class="text-muted small">My Assigned</div>
+                    <div class="fs-3 fw-semibold">@Dashboard.MyAssignedTickets</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-4">
+            <div class="card h-100">
+                <div class="card-header">Status Snapshot</div>
+                <div class="card-body">
+                    @foreach (var entry in Dashboard.ByStatus.OrderBy(entry => entry.Key))
+                    {
+                        <div class="d-flex justify-content-between border-bottom py-2">
+                            <span>@entry.Key</span>
+                            <strong>@entry.Value</strong>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card h-100">
+                <div class="card-header">Priority Snapshot</div>
+                <div class="card-body">
+                    @foreach (var entry in Dashboard.ByPriority.OrderBy(entry => entry.Key))
+                    {
+                        <div class="d-flex justify-content-between border-bottom py-2">
+                            <span>@entry.Key</span>
+                            <strong>@entry.Value</strong>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card h-100">
+                <div class="card-header">Quick Actions</div>
+                <div class="card-body d-flex flex-column gap-2">
+                    <a class="btn btn-primary" href="/tickets">Open Ticket Workspace</a>
+                    <a class="btn btn-outline-primary" href="/tickets">Create New Ticket</a>
+                    <a class="btn btn-outline-secondary" href="/agents">View Agent Demo</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mt-4">
+        <div class="card-header">Recently Updated</div>
+        <div class="card-body">
+            @if (Dashboard.RecentlyUpdated.Count == 0)
+            {
+                <p class="text-muted mb-0">No tickets have been updated yet.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Title</th>
+                                <th>Status</th>
+                                <th>Priority</th>
+                                <th>Updated</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var ticket in Dashboard.RecentlyUpdated)
+                            {
+                                <tr>
+                                    <td>#@ticket.Id</td>
+                                    <td>@ticket.Title</td>
+                                    <td>@ticket.Status</td>
+                                    <td>@ticket.Priority</td>
+                                    <td>@ticket.UpdatedAt.ToLocalTime().ToString("g")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private TicketDashboardSummary Dashboard = new(0, 0, 0, 0, 0, new Dictionary<TicketStatus, int>(), new Dictionary<TicketPriority, int>(), []);
+    private string? CurrentUserId;
+    private bool IsAgent;
+    private bool IsAdmin;
+    private string? ErrorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            CurrentUserId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            IsAgent = user.IsInRole(ApplicationRoles.Agent);
+            IsAdmin = user.IsInRole(ApplicationRoles.Admin);
+
+            if (!string.IsNullOrWhiteSpace(CurrentUserId))
+            {
+                Dashboard = await TicketService.GetDashboardAsync(CurrentUserId, IsAgent, IsAdmin);
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Dashboard data unavailable: {ex.Message}";
+        }
+    }
+}

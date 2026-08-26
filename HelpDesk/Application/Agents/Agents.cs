@@ -243,7 +243,7 @@ public sealed class OrchestratorAgent
         audit.Add(NewAudit($"Step 2: parsed plan into {phases.Count} phase(s)."));
 
         var responses = new List<AgentResponse>();
-        var contextChain = request.Context;
+        var contextChain = request.Context ?? string.Empty;
 
         foreach (var phase in phases)
         {
