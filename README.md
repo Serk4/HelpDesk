@@ -1,8 +1,12 @@
 ﻿# HelpDesk
 
-A Help Desk / Ticket Management system built with **.NET 9**, **Blazor**, and **Entity Framework Core**.
+## AI‑Augmented Help Desk & Ticketing System
 
-This project demonstrates complex workflow architecture, domain-driven design, audit trail patterns, role-based access control, and clean separation of concerns — reflecting real-world practices used in high-integrity, regulated systems.
+HelpDesk is a modern **.NET 9**, **Blazor**, and **EF Core** application that demonstrates workflow architecture, domain‑driven design, audit trails, and role‑based access — enhanced with an embedded multi‑agent orchestration pipeline.
+
+The app includes a Planner, Designer, and Coder agent system capable of analyzing objectives, proposing UI/UX layouts, outlining architectural changes, and generating code scaffolding. This pipeline runs inside the application itself, providing an AI‑augmented development console that can help evolve and extend the system.
+
+This project serves as a portfolio‑grade example of integrating multi‑agent AI patterns into a real‑world enterprise application while maintaining clean architecture, strong typing, and production‑ready design.
 
 ---
 
@@ -71,14 +75,14 @@ Key design goals:
    ```
 
 ### Project Structure
-
+```
 HelpDesk/
 ├── Domain/          # Entities, enums, domain logic
 ├── Application/     # Interfaces, DTOs, application services
 ├── Infrastructure/  # EF Core, Identity, repositories
 ├── HelpDesk/        # Blazor Web App (Presentation)
 └── README.md
-
+```
 ### Domain Highlights
 
 - Ticket is treated as an aggregate root
@@ -93,6 +97,14 @@ HelpDesk/
 - [ ] Background job example (auto-escalation)
 - [ ] Reporting (volume & resolution time)
 - [ ] Improved dashboard visualizations
+
+## 📸 Screenshots
+
+### Agent Pipeline Orchestrator
+![Agent Pipeline Screenshot](./screenshots/Agent_Pipeline_tab.png)
+
+*A development console inside the HelpDesk app that orchestrates Planner, Designer, and Coder agents.*
+
 
 ### License
 
