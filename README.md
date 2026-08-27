@@ -100,10 +100,22 @@ HelpDesk/
 
 ## 📸 Screenshots
 
+### HelpDesk Dashboard
+![HelpDesk Dashboard Screenshot](./screenshots/Helpdesk_dashboard.png)
+*Main dashboard*
+
+### Ticket List
+![Ticket List Screenshot](./screenshots/Ticket_list.png)
+*Ticket list tab*
+
+### Create Tickets
+![Ticket Create Screenshot](./screenshots/Ticket_create.png)
+*Create tickets screen*
+
 ### Agent Pipeline Orchestrator
 ![Agent Pipeline Screenshot](./screenshots/Agent_Pipeline_tab.png)
 
-*A development console inside the HelpDesk app that orchestrates Planner, Designer, and Coder agents.*
+*A development console (demo/place-holder) inside the HelpDesk app that orchestrates Planner, Designer, and Coder agents.*
 
 
 ### License
